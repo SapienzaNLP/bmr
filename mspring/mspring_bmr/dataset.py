@@ -29,7 +29,7 @@ class AMRDataset(Dataset):
         remove_wiki=False,
         dereify=True,
         raw_data=True
-    ):
+    ):  
         self.paths = paths
         self.tokenizer = tokenizer
         self.snt_tokenizer = snt_tokenizer
@@ -46,8 +46,6 @@ class AMRDataset(Dataset):
         self.tok_snts = []
         self.remove_longer_than = remove_longer_than
         self.snt_lang = []
-        self.doc = []
-        self.dif_doc = []
 
         for g in graphs:
             l, e = self.tokenizer.linearize(g)
@@ -68,27 +66,15 @@ class AMRDataset(Dataset):
             self.sentences.append(g.metadata['snt'])
             
             if 'lng' in g.metadata:
-                self.snt_lang.append(lang_map[g.metadata['lng']])
+                self.snt_lang.append(lang_map[g.metadata['lng'] if g.metadata['lng'] in lang_map else 'en'])
             else:
                 self.snt_lang.append(None)
 
-            if 'doc' in g.metadata:
-                doc_token = '<' + g.metadata['doc'].strip() + '>'
-                self.doc.append(doc_token)
-                if doc_token not in self.dif_doc:
-                    self.dif_doc.append(doc_token)
-
-            else:
-                self.doc.append(None)
 
             self.graphs.append(g)
             self.linearized.append(l)
             self.linearized_extra.append(e)
 
-        self.snt_tokenizer.add_tokens(self.dif_doc)
-        self.snt_tokenizer.delete_tokens = self.dif_doc
-        self.tokenizer.add_tokens(self.dif_doc)
-        self.tokenizer.delete_tokens = self.dif_doc
 
     def __len__(self):
         return len(self.sentences)
@@ -100,7 +86,6 @@ class AMRDataset(Dataset):
         sample['lng'] = self.snt_lang[idx]
         sample['graphs'] = self.graphs[idx]
         sample['tok_sentences'] = self.tok_snts[idx]
-        sample['doc'] = self.doc[idx]
         if self.linearized is not None:
             sample['linearized_graphs_ids'] = self.linearized[idx]
             sample.update(self.linearized_extra[idx])            
@@ -112,9 +97,8 @@ class AMRDataset(Dataset):
     def collate_fn(self, samples, device=torch.device('cpu')):
         x = [s['sentences'] for s in samples]
         x_lng = [s['lng'] for s in samples]
-        x_doc = [s['doc'] for s in samples]
 
-        x, extra = self.batch_encode_sentences(x, x_lng, x_doc, device=device)
+        x, extra = self.batch_encode_sentences(x, x_lng, device=device)
 
         y = [s['graphs'] for s in samples]
         y, extra_y = self.tokenizer.batch_encode_graphs(y, device=device)
@@ -125,26 +109,19 @@ class AMRDataset(Dataset):
             y, extra_y = self.tokenizer.batch_encode_graphs_from_linearized(y, samples, device=device)
             extra.update(extra_y)
 
-            if None not in x_doc:
-                # add sentence doc after begining of sentence token
-                sentences_doc_tensor = torch.tensor(self.snt_tokenizer.convert_tokens_to_ids(x_doc), dtype=torch.long, device=y['decoder_input_ids'].device)
-                
-                # concat begining of sentence token in input_ids
-                y["decoder_input_ids"] = torch.cat((y["decoder_input_ids"][:, :1], sentences_doc_tensor.unsqueeze(1), y["decoder_input_ids"][:, 1:]), 1)
-                y["labels"] = torch.cat((sentences_doc_tensor.unsqueeze(1), y["labels"][:, :]), 1)
         else:
             y = None
 
         extra['ids'] = [s['id'] for s in samples]
         return x, y, extra
 
-    def batch_encode_sentences(self, sentences, sentences_lng, sentences_doc, device=torch.device('cpu')):
+    def batch_encode_sentences(self, sentences, sentences_lng, device=torch.device('cpu')):
         sentences = [s for s in sentences]
         extra = {'sentences': sentences}
 
         batch = self.snt_tokenizer.batch_encode_plus(sentences, return_tensors='pt', padding=True)
 
-        if None not in sentences_lng:
+        if "MBart" in self.tokenizer.__class__.__name__:
             sentences_lng_tensor = torch.tensor(self.snt_tokenizer.convert_tokens_to_ids(sentences_lng), dtype=torch.long, device=batch['input_ids'].device)
 
             if self.tokenizer.direction == "text":
@@ -155,16 +132,6 @@ class AMRDataset(Dataset):
             else:
                 batch["input_ids"][batch["input_ids"]==self.snt_tokenizer.convert_tokens_to_ids(self.snt_tokenizer.src_lang)] = sentences_lng_tensor
         
-
-        if None not in sentences_doc:
-            # add sentence doc after begining of sentence token
-            sentences_doc_tensor = torch.tensor(self.snt_tokenizer.convert_tokens_to_ids(sentences_doc), dtype=torch.long, device=batch['input_ids'].device)
-            
-            # concat begining of sentence token in input_ids
-            batch["input_ids"] = torch.cat((batch["input_ids"][:, :1], sentences_doc_tensor.unsqueeze(1), batch["input_ids"][:, 1:]), 1)
-
-            # add 1 in attention_mask
-            batch["attention_mask"] = torch.cat((torch.ones_like(sentences_doc_tensor).unsqueeze(1), batch["attention_mask"]), 1)
 
         batch = {k: v.to(device) for k, v in batch.items()}
         return batch, extra

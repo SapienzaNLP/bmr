@@ -6,6 +6,7 @@ If you need the checkpoints of other experiments in the paper, please send us an
 cd mspring
 pip install -r requirements.txt
 pip install -e .
+conda install pytorch torchvision torchaudio cudatoolkit=11.3 -c pytorch
 ```
 
 The code only works with `transformers` < 3.0 because of a disrupting change in positional embeddings.
