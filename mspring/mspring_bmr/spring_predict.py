@@ -17,7 +17,7 @@ def spring_predict_sentences_from_graph_list(
     checkpoint,
     mode="amr",
     language="en_XX",
-    model="facebook/bart-large",
+    model_name="facebook/bart-large",
     beam_size=5,
     batch_size=500,
     device="cuda",
@@ -31,7 +31,7 @@ def spring_predict_sentences_from_graph_list(
 ):
     device = torch.device(device)
     model, tokenizer, snt_tokenizer = instantiate_model_and_tokenizer(
-        model,
+        model_name,
         checkpoint=checkpoint,
         dropout=0.0,
         attention_dropout=0.0,
@@ -47,7 +47,7 @@ def spring_predict_sentences_from_graph_list(
     model.to(device)
     model.rev.amr_mode = False
 
-    loader = instantiate_loader_graphs(dataset, tokenizer, batch_size=batch_size)
+    loader = instantiate_loader_graphs(dataset, tokenizer, snt_tokenizer, batch_size=batch_size)
     loader.device = device
 
     shuffle_orig = loader.shuffle
@@ -112,7 +112,7 @@ def spring_predict_amr_from_amr_file(
     checkpoint,
     mode="amr",
     language="en_XX",
-    mode_name="facebook/bart-large",
+    model_name="facebook/bart-large",
     beam_size=5,
     batch_size=500,
     device="cuda",
@@ -127,7 +127,7 @@ def spring_predict_amr_from_amr_file(
 
     device = torch.device(device)
     model, tokenizer, snt_tokenizer = instantiate_model_and_tokenizer(
-        mode_name,
+        model_name,
         checkpoint=checkpoint,
         dropout=0.0,
         attention_dropout=0.0,
@@ -151,7 +151,7 @@ def spring_predict_amr_from_amr_file(
     )
     loader.device = device
 
-    decoder_token_id = 0 if mode_name == "facebook/bart-large" else tokenizer.convert_tokens_to_ids("en_XX")
+    decoder_token_id = 0 if model_name == "facebook/bart-large" else tokenizer.convert_tokens_to_ids("en_XX")
 
 
     graphs = predict_amrs(
@@ -234,7 +234,7 @@ def spring_predict_amr_from_sentence_list(
 ):
     device = torch.device(device)
     model, tokenizer, snt_tokenizer = instantiate_model_and_tokenizer(
-        model,
+        model_name,
         checkpoint=checkpoint,
         dropout=0.0,
         attention_dropout=0,
@@ -257,7 +257,7 @@ def spring_predict_amr_from_sentence_list(
         ids, sentences, _ = zip(*batch)
 
         x = snt_tokenizer.batch_encode_plus(list(sentences), return_tensors='pt', padding=True)
-        x = {k: v.to(device) for k, v in batch.items()}
+        x = {k: v.to(device) for k, v in x.items()}
 
         with torch.no_grad():
             model.amr_mode = True

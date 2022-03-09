@@ -107,8 +107,11 @@ if __name__ == "__main__":
         predictions = []
         gold_sentences = []
         for idx, g in enumerate(loader.dataset.graphs):
-            gold_sentences.append(g.metadata["id"] + "\t" + loader.dataset.sentences[idx])
-            predictions.append(g.metadata["id"] + "\t" + pred_sentences[idx])
+            # gold_sentences.append(g.metadata["id"] + "\t" + loader.dataset.sentences[idx])
+            # predictions.append(g.metadata["id"] + "\t" + pred_sentences[idx])
+            gold_sentences.append(loader.dataset.sentences[idx])
+            predictions.append(pred_sentences[idx])
+
 
         args.gold_path.write_text("\n".join(gold_sentences))
         args.pred_path.write_text("\n".join(predictions))
