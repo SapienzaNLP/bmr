@@ -1,0 +1,90 @@
+
+name: spring
+model: facebook/bart-large #/home/martinez/project/utils/embeding_bn_synsets/model/bart-bn-gloss-rd
+# model: facebook/mbart-large-cc25
+
+# <--------------
+# Linearizations
+# Comment DFS and uncomment the relevant block if you want to use a different linearization scheme
+
+# DFS
+penman_linearization: True
+use_pointer_tokens: True
+raw_graph: False
+
+# BFS
+# penman_linearization: False
+# use_pointer_tokens: True
+# raw_graph: False
+
+# PENMAN
+# penman_linearization: True
+# use_pointer_tokens: False
+# raw_graph: False
+
+# BART baseline
+# penman_linearization: True
+# use_pointer_tokens: False
+# raw_graph: True
+
+remove_wiki: False
+dereify: False
+collapse_name_ops: False
+
+# Hparams
+batch_size: 500
+beam_size: 1
+dropout: 0.25
+attention_dropout: 0.0
+smart_init: True
+accum_steps: 10
+warmup_steps: 1
+training_steps: 250000
+weight_decay: 0.004
+grad_norm: 2.5
+scheduler: constant
+learning_rate: 0.00005
+max_epochs: 25
+save_checkpoints: False
+log_wandb: False
+warm_start: True
+use_recategorization: False
+best_loss: False
+remove_longer_than: 1024
+
+# <------------------
+# Data: replace DATA below with the root of your AMR 2/3 release folder
+
+
+
+
+train: /home/martinez/project/amr-data/amr-3.0/data/amrs/split/training/*.txt
+dev: /home/martinez/project/amr-data/amr-3.0/data/amrs/split/dev/*.txt
+test: /home/martinez/project/amr-data/amr-3.0/data/amrs/split/test/*.txt
+
+train: /home/martinez/project/amr-data/amr-3.0/data/amrs/split/training/*.txt
+dev: /home/martinez/project/amr-data/amr-3.0/data/amrs/split/dev/*.txt
+test: /home/martinez/project/amr-data/amr-3.0/data/amrs/split/test/*.txt
+
+train: data/graphs/bn_full_lemmas_sp/split/test/amr-release-3.0-alignments-test-dfa-reduced.tsv
+test: data/graphs/bn_full_lemmas_sp/split/test/amr-release-3.0-alignments-test-dfa-reduced.tsv
+dev: data/graphs/bn_full_lemmas_sp/split/test/amr-release-3.0-alignments-test-dfa-reduced.tsv
+
+train: /home/martinez/project/amr3_disambiguation/pythonProject/output/bmr/experiments/bmr_lemmas_1/split/training/*.tsv
+dev: /home/martinez/project/amr3_disambiguation/pythonProject/output/bmr/experiments/bmr_lemmas_1/split/dev/*.tsv
+test: /home/martinez/project/amr3_disambiguation/pythonProject/output/bmr/experiments/bmr_lemmas_1/split/test/*.tsv
+
+
+train: /home/martinez/project/mspring/text.txt
+dev: /home/martinez/project/mspring/text.txt
+test: /home/martinez/project/mspring/text.txt
+
+
+train: data/graphs/bmr+/split/training/*.tsv
+dev: data/graphs/bmr+/split/dev/*.tsv
+test: data/graphs/bmr+/split/test/*.tsv
+
+train: data/graphs/bmr+/msplit/training/*.txt
+dev: data/graphs/bmr+/msplit/dev/*.txt
+test: data/graphs/bmr+/msplit/test/*.txt
+
