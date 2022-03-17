@@ -55,8 +55,8 @@ def read_file_in_batches_gloss(path, batch_size=1000, max_length=100):
 
     return _iterator(data), len(data)
 
-def read_file_in_batches(path, batch_size=1000, max_length=100):
-
+def read_file_in_batches(path, batch_size=1000):
+    snt_batch_size = round(batch_size * 0.5)
     data = []
     idx = 0
     for line in Path(path).read_text().strip().splitlines():
@@ -65,7 +65,7 @@ def read_file_in_batches(path, batch_size=1000, max_length=100):
         if not line:
             continue
         n = len(line.split())
-        if n > max_length:
+        if n > 100:
             continue
         data.append((idx, line, n))
 
@@ -78,7 +78,7 @@ def read_file_in_batches(path, batch_size=1000, max_length=100):
 
         for sample in data:
             idx, line, n = sample
-            if n > batch_size:
+            if n > snt_batch_size:
                 if batch:
                     yield batch
                     maxn = 0
@@ -88,10 +88,11 @@ def read_file_in_batches(path, batch_size=1000, max_length=100):
                 curr_batch_size = maxn * len(batch)
                 cand_batch_size = max(maxn, n) * (len(batch) + 1)
 
-                if 0 < curr_batch_size <= batch_size and cand_batch_size > batch_size:
+                if 0 < curr_batch_size <= snt_batch_size and cand_batch_size > snt_batch_size:
                     yield batch
                     maxn = 0
                     batch = []
+                
                 maxn = max(maxn, n)
                 batch.append(sample)
 
@@ -143,7 +144,7 @@ if __name__ == "__main__":
         use_pointer_tokens=args.use_pointer_tokens,
         mode=args.mode,
         language=args.language,
-        direction="amr",
+        direction="graph",
     )
     model.load_state_dict(torch.load(args.checkpoint, map_location="cpu")["model"])
     model.to(device)
@@ -164,28 +165,25 @@ if __name__ == "__main__":
                 # x, _ = tokenizer.batch_encode_sentences(sentences, device=device)
                 ids, sentences, _ = zip(*batch)
 
-                batch = snt_tokenizer.batch_encode_plus(list(sentences), return_tensors='pt', padding=True)
-                batch["input_ids"][batch["input_ids"]==snt_tokenizer.convert_tokens_to_ids(snt_tokenizer.src_lang)] = decoder_start_token_id
-                x = {k: v.to(device) for k, v in batch.items()}
-
+                x = snt_tokenizer.batch_encode_plus(list(sentences), return_tensors='pt', padding=True)
+                #batch["input_ids"][batch["input_ids"]==snt_tokenizer.convert_tokens_to_ids(snt_tokenizer.src_lang)] = decoder_start_token_id
+                x = {k: v.to(device) for k, v in x.items()}
+                w = [v for k,v in x.items()]
                 with torch.no_grad():
                     model.amr_mode = True
-                    out = model.generate(**x, max_length=args.batch_size, decoder_start_token_id=snt_tokenizer.convert_tokens_to_ids(snt_tokenizer.src_lang), num_beams=args.beam_size)
+                    out = model.generate(
+                        **x,
+                        max_length=args.batch_size,
+                        num_beams=args.beam_size,
+                        forced_bos_token_id=36,
+                        early_stopping=True,
+                        num_return_sequences=1,
+                        no_repeat_ngram_size=0,
+                        length_penalty=1.0)
+
 
                 bgraphs = []
-                # for idx, sent, tokk, lemma, synset_id, sentence_id in zip(ids, sentences, out, lemmas, synset_ids, sentence_ids):
-                #     graph, status, (lin, backr) = tokenizer.decode_amr(tokk.tolist(), restore_name_ops=args.restore_name_ops)
-                #     if args.only_ok and ("OK" not in str(status)):
-                #         continue
-                #     # graph.metadata['status'] = str(status)
-                #     graph.metadata["source"] = path
-                #     graph.metadata["nsent"] = str(idx)
-                #     graph.metadata["snt"] = sent
-                #     if lemma.strip() != "LEMMA_PLACEHOLDER":
-                #         graph.metadata['lemma'] = lemma.strip()
-                #     graph.metadata['synset_id'] = synset_id.strip()
-                #     graph.metadata['id'] = sentence_id.strip()
-                #     bgraphs.append((idx, graph))
+
 
                 for idx, sent, tokk in zip(ids, sentences, out):
                     graph, status, (lin, backr) = tokenizer.decode_amr(tokk.tolist(), restore_name_ops=args.restore_name_ops)
@@ -196,13 +194,14 @@ if __name__ == "__main__":
                     graph.metadata['id'] = str(idx)
                     graph.metadata['snt'] = sent
                     bgraphs.append((idx, graph))
+
                 for i, g in bgraphs:
                     graphs_predictions.append([i, g])
 
         graphs_predictions.sort(key=lambda x: x[0])
         graphs_predictions_graphs = [encode(g) for (_, g) in graphs_predictions]
-        new_file = path.replace(".txt", "_bmr.txt")
-        with open("graphs.txt", "w") as f0:
+
+        with open("data/model/parsing/AMR/AMR-en/pred.plain.graphs.txt", "w") as f0:
             f0.write("\n\n".join(graphs_predictions_graphs))
 
         exit(0)

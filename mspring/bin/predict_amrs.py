@@ -47,6 +47,9 @@ if __name__ == "__main__":
         "--gold-path", type=Path, default=ROOT / "data/tmp/inf-gold.txt", help="Where to write the gold file."
     )
     parser.add_argument(
+        "--sorted-pred-path", type=Path, default=ROOT / "data/tmp/inf-sorted-pred.txt", help="Where to write the sorted prediction file."
+    )
+    parser.add_argument(
         "--use-recategorization",
         action="store_true",
         help="Predict using Zhang recategorization on top of our linearization (requires recategorized sentences in input).",
@@ -58,6 +61,7 @@ if __name__ == "__main__":
     parser.add_argument("--raw-graph", action="store_true")
     parser.add_argument("--restore-name-ops", action="store_true")
     parser.add_argument("--return-all", action="store_true")
+    parser.add_argument("--mode", type=str, default="bmr", help="Mode used to run the program, either amr/amr+/bmr/amr2bmr.")
     parser.add_argument("--language", type=str, default="en_XX", help="Language of the target sentences.")
 
     args = parser.parse_args()
@@ -69,9 +73,9 @@ if __name__ == "__main__":
         penman_linearization=args.penman_linearization,
         use_pointer_tokens=args.use_pointer_tokens,
         raw_graph=args.raw_graph,
-        mode="bmr",
-        language="en_XX",
-        direction="amr",
+        mode=args.mode,
+        language=args.language,
+        direction="graph",
     )
 
     model.amr_mode = True
@@ -96,10 +100,7 @@ if __name__ == "__main__":
     )
     loader.device = device
 
-    if args.model == "facebook/bart-large":
-        decoder_start_token_id = 0
-    else:
-        decoder_token_id = tokenizer.convert_tokens_to_ids("en_XX")
+    decoder_token_id = 0 if args.model == "facebook/bart-large" else tokenizer.convert_tokens_to_ids("en_XX")
 
     graphs = predict_amrs(
         loader,

@@ -27,32 +27,35 @@ def predict_amrs(loader, model, tokenizer, beam_size=1, decoder_start_token_id=0
         tokens = []
         with tqdm(total=total) as bar:
             for x, y, extra in loader:
-                with open('test_full.txt', 'a') as f:
-                    f.write('\n'.join([str(item) for item in x['input_ids'].tolist()]))
                 ii = extra['ids']
                 ids.extend(ii)
                 with torch.no_grad():
                     out = model.generate(
                         **x,
                         max_length=1024,
-                        decoder_start_token_id=decoder_start_token_id,
                         num_beams=beam_size,
+                        # decoder_input_ids=torch.tensor([decoder_start_token_id, 36], device=x['input_ids'].device).repeat(beam_size, 1),
+                        forced_bos_token_id=36,
                         num_return_sequences=beam_size,
                         early_stopping=True,
                         no_repeat_ngram_size=0,
                         length_penalty=1.0)
+
+
                 nseq = len(ii)
                 for i1 in range(0, out.size(0), beam_size):
                     tokens_same_source = []
                     tokens.append(tokens_same_source)
                     for i2 in range(i1, i1+beam_size):
                         tokk = out[i2]
-                        tokk = [t for t in tokk.tolist() if not t in tokenizer.convert_tokens_to_ids(tokenizer.delete_tokens) ]
+                        tokk = [t for t in tokk.tolist()]
                         tokens_same_source.append(tokk)
+                
                 bar.update(nseq)
         # reorder
         tokens = [tokens[i] for i in ids]
         tokens = [t for tt in tokens for t in tt]
+
 
     graphs = []
     for i1 in range(0, len(tokens), beam_size):
@@ -121,7 +124,7 @@ def predict_sentences(loader, model, tokenizer, beam_size=1, decoder_start_token
                     tokens.append(tokens_same_source)
                     for i2 in range(i1, i1+beam_size):
                         tokk = out[i2]
-                        tokk = [t for t in tokk.tolist() if t > 2 and not t in tokenizer.convert_tokens_to_ids(tokenizer.delete_tokens) ]
+                        tokk = [t for t in tokk.tolist() if t > 2]
                         tokens_same_source.append(tokk)
                 bar.update(out.size(0) // beam_size)
         #reorder
@@ -181,7 +184,7 @@ def predict_sentences_multilingual(loader, model, tokenizer, beam_size=1, decode
                     tokens.append(tokens_same_source)
                     for i2 in range(i1, i1+beam_size):
                         tokk = out[i2]
-                        tokk = [t for t in tokk.tolist() if t > 2 and not t in tokenizer.convert_tokens_to_ids(tokenizer.delete_tokens) and not ((t >= 250003 ) and (t <= 250025))]
+                        tokk = [t for t in tokk.tolist() if t > 2 and not ((t >= 250003 ) and (t <= 250025))]
                         tokens_same_source.append(tokk)
                 bar.update(out.size(0) // beam_size)
         #reorder
