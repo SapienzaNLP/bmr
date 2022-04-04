@@ -9,7 +9,7 @@ pip install -e .
 conda install pytorch torchvision torchaudio cudatoolkit=11.3 -c pytorch
 ```
 
-The code only works with `transformers` < 3.0 because of a disrupting change in positional embeddings.
+The code only works with `transformers` 4.11. 
 The code works fine with `torch` 1.5. We recommend the usage of a new `conda` env.
 
 ## Train
