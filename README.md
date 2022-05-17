@@ -45,7 +45,7 @@ python bin/predict_amrs.py \
 `gold.amr.txt` and `pred.amr.txt` will contain, respectively, the concatenated gold and the predictions.
 
 To reproduce our paper's results, you will also need need to run the [BLINK](https://github.com/facebookresearch/BLINK) 
-entity linking system on the prediction file (`data/tmp/amr2.0/pred.amr.txt` in the previous code snippet). 
+entity linking system on the prediction file (`data/tmp/amr3.0/pred.amr.txt` in the previous code snippet). 
 To do so, you will need to install BLINK, and download their models:
 ```shell script
 git clone https://github.com/facebookresearch/BLINK.git
@@ -59,8 +59,8 @@ cd ../..
 Then, you will be able to launch the `blinkify.py` script:
 ```shell
 python bin/blinkify.py \
-    --datasets data/tmp/amr2.0/pred.amr.txt \
-    --out data/tmp/amr2.0/pred.amr.blinkified.txt \
+    --datasets data/tmp/amr3.0/pred.amr.txt \
+    --out data/tmp/amr3.0/pred.amr.blinkified.txt \
     --device cuda \
     --blink-models-dir BLINK/models
 ```
@@ -71,13 +71,16 @@ results that are around ~0.3 Smatch points lower than those returned by `bin/pre
 ```shell script
 python bin/predict_sentences.py \
     --datasets <AMR-ROOT>/data/amrs/split/test/*.txt \
-    --gold-path data/tmp/amr2.0/gold.text.txt \
-    --pred-path data/tmp/amr2.0/pred.text.txt \
+    --gold-path data/tmp/amr3.0/gold.text.txt \
+    --pred-path data/tmp/amr3.0/pred.text.txt \
     --checkpoint runs/<checkpoint>.pt \
     --beam-size 5 \
     --batch-size 500 \
     --device cuda \
     --penman-linearization --use-pointer-tokens
+    --mode amr
+    --model facebook/mbart-large-cc25
+    --language en_XX
 ```
 `gold.text.txt` and `pred.text.txt` will contain, respectively, the concatenated gold and the predictions.
 For BLEU, chrF++, and Meteor in order to be comparable you will need to tokenize both gold and predictions using [JAMR tokenizer](https://github.com/redpony/cdec/blob/master/corpus/tokenize-anything.sh).
