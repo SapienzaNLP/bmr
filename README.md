@@ -2,9 +2,9 @@ The code for moving from AMR to BMR has sensitive data from AMR and BabelNet, th
 
 ## Installation
 ```shell script
+conda install pytorch cudatoolkit=11.3 -c pytorch
 pip install -r requirements.txt
 pip install -e .
-conda install pytorch torchvision torchaudio cudatoolkit=11.3 -c pytorch
 ```
 
 The code only works with `transformers` 4.11. 
