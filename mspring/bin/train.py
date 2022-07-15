@@ -44,13 +44,13 @@ import time
 import random
 import numpy as np
 
-random.seed(12)
-np.random.seed(12)
-torch.manual_seed(12)
-torch.cuda.manual_seed_all(12)
+random.seed(112)
+np.random.seed(112)
+torch.manual_seed(112)
+torch.cuda.manual_seed_all(112)
 
 
-def do_train(checkpoint=None, model_name="facebook/bart-large", direction="graph", mode="amr", language="en_XX", split_both_decoder=False, fp16=False):
+def do_train(checkpoint=None, model_name="facebook/bart-base", direction="graph", mode="amr", language="en_XX", split_both_decoder=False, fp16=False):
 
     assert direction in ("graph", "text", "both")
     start = time.time()
@@ -141,6 +141,7 @@ def do_train(checkpoint=None, model_name="facebook/bart-large", direction="graph
 
             with autocast(enabled=fp16):
                 output = model(**x, **y)
+
 
             loss = output["loss"]
             scaler.scale((loss / config["accum_steps"])).backward()
@@ -259,10 +260,10 @@ def do_train(checkpoint=None, model_name="facebook/bart-large", direction="graph
                 device = next(model.parameters()).device
                 dev_loader.device = device
 
-                if model_name == "facebook/bart-large":
+                if model_name == "facebook/bart-base":
                     decoder_token = 0
                 else:
-                    decoder_token = tokenizer.convert_tokens_to_ids("en_XX")
+                    decoder_token = tokenizer.convert_tokens_to_ids("en_EN")
 
                 graphs = predict_amrs(
                     dev_loader,
@@ -286,10 +287,10 @@ def do_train(checkpoint=None, model_name="facebook/bart-large", direction="graph
                 dev_loader.device = device
 
 
-                if model_name == "facebook/bart-large":
+                if model_name == "facebook/bart-base":
                     decoder_token = 0
                 else:
-                    decoder_token = tokenizer.convert_tokens_to_ids("en_XX")
+                    decoder_token = tokenizer.convert_tokens_to_ids(language)
 
                 pred_sentences = predict_sentences_multilingual(
                     dev_loader,
@@ -472,7 +473,7 @@ if __name__ == "__main__":
         help="Train a model with (amr, amr+, bmr, bmr*).",
     )
     parser.add_argument(
-        "--model", type=str, default="facebook/bart-large", help="Model config to use to load the model class."
+        "--model", type=str, default="facebook/bart-base", help="Model config to use to load the model class."
     )
     parser.add_argument(
         "--language",
@@ -496,11 +497,11 @@ if __name__ == "__main__":
         config = yaml.load(y, Loader=yaml.FullLoader)
 
     if config["log_wandb"]:
-        wandb.init(entity="carlosml26", project="spring", config=config, dir=str(ROOT / "runs/"))
+        wandb.init(entity="carlosml26", project="spring-test", config=config, dir=str(ROOT / "runs/splits/"))
         config = wandb.config
 
     print(config)
-
+    
     if args.checkpoint:
         checkpoint = args.checkpoint
     else:

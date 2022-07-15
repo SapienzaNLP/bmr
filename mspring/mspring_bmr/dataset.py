@@ -26,6 +26,7 @@ class AMRDataset(Dataset):
         device=torch.device('cpu'),
         use_recategorization=False,
         remove_longer_than=None,
+        evaluation=False,
         remove_wiki=False,
         dereify=True,
         raw_data=True
@@ -42,64 +43,67 @@ class AMRDataset(Dataset):
         self.graphs = []
         self.sentences = []
         self.linearized = []
+        self.input = []
+        self.input_tok = []
+        self.tokenized = []
         self.linearized_extra = []
-        self.tok_snts = []
+        self.snt_tok = []
         self.remove_longer_than = remove_longer_than
         self.snt_lang = []
 
         for g in graphs:
             l, e = self.tokenizer.linearize(g)
-  
+            
             try:
-                # tok_snt = self.snt_tokenizer.tokenize(g.metadata['snt'])
                 tok_snt = len(g.metadata['snt'].split())
             except:
                 logging.warning('Invalid sentence!')
                 continue
 
             if remove_longer_than and len(l) > remove_longer_than:
-                continue
-            if len(l) > 1024:
                 logging.warning('Sequence longer than 1024 included. BART does not support it!')
+                continue
             
-            self.tok_snts.append(tok_snt)
-            self.sentences.append(g.metadata['snt'])
-            
+            x_snt = g.metadata['snt']
+            x_tok = self.snt_tokenizer.tokenize(x_snt)
+
             if 'lng' in g.metadata:
                 self.snt_lang.append(lang_map[g.metadata['lng'] if g.metadata['lng'] in lang_map else 'en'])
             else:
                 self.snt_lang.append(None)
 
-
+            self.input.append(x_snt)
             self.graphs.append(g)
             self.linearized.append(l)
             self.linearized_extra.append(e)
+            self.input_tok.append(x_tok)
 
 
     def __len__(self):
-        return len(self.sentences)
+        return max(len(self.input_tok), len(self.linearized))
     
     def __getitem__(self, idx):
         sample = {}
         sample['id'] = idx
-        sample['sentences'] = self.sentences[idx]
+        sample['input'] = self.input[idx]
         sample['lng'] = self.snt_lang[idx]
         sample['graphs'] = self.graphs[idx]
-        sample['tok_sentences'] = self.tok_snts[idx]
+        sample['input_tok'] = self.input_tok[idx]
         if self.linearized is not None:
             sample['linearized_graphs_ids'] = self.linearized[idx]
             sample.update(self.linearized_extra[idx])            
         return sample
     
     def size(self, sample):
-        return len(sample['sentences'])
+        return max(len(sample['input_tok']), len(sample['linearized_graphs_ids']))
     
     def collate_fn(self, samples, device=torch.device('cpu')):
-        x = [s['sentences'] for s in samples]
+        x = [s['input'] for s in samples]
+        
         x_lng = [s['lng'] for s in samples]
-
+        
         x, extra = self.batch_encode_sentences(x, x_lng, device=device)
-
+        
         y = [s['graphs'] for s in samples]
         y, extra_y = self.tokenizer.batch_encode_graphs(y, device=device)
         extra.update(extra_y)
@@ -155,7 +159,7 @@ class AMRDatasetTokenBatcherAndLoader:
 
     @cached_property
     def sort_ids(self):
-        lengths = [len(s.split()) for s in self.dataset.sentences]
+        lengths = [len(s.split()) for s in self.dataset.input]
         ids, _ = zip(*sorted(enumerate(lengths), reverse=True))
         ids = list(ids)
         return ids

@@ -65,9 +65,38 @@ def read_file_in_batches(path, batch_size=1000):
         if not line:
             continue
         n = len(line.split())
-        if n > 100:
+        if n > 50:
             continue
         data.append((idx, line, n))
+
+    data_len = data.copy()
+    data_len = sorted(data_len, key=lambda x: x[2], reverse=True)
+
+    maxn = 0
+    batch = []
+    batch_len = 0
+    for sample in data_len:
+        idx, line, n = sample
+        if n > snt_batch_size:
+            if batch:
+                batch_len += 1
+                maxn = 0
+                batch = []
+            batch_len += 1
+        else:
+            curr_batch_size = maxn * len(batch)
+            cand_batch_size = max(maxn, n) * (len(batch) + 1)
+
+            if 0 < curr_batch_size <= snt_batch_size and cand_batch_size > snt_batch_size:
+                batch_len += 1
+                maxn = 0
+                batch = []
+            
+            maxn = max(maxn, n)
+            batch.append(sample)
+
+    if batch:
+        batch_len += 1
 
     def _iterator(data):
 
@@ -99,7 +128,7 @@ def read_file_in_batches(path, batch_size=1000):
         if batch:
             yield batch
 
-    return _iterator(data), len(data)
+    return _iterator(data), len(data), batch_len
 
 if __name__ == "__main__":
 
@@ -153,12 +182,13 @@ if __name__ == "__main__":
     graphs_predictions = []
 
     decoder_start_token_id = 0 if args.model == "facebook/bart-large" else snt_tokenizer.convert_tokens_to_ids(args.language)
-
-    for path in tqdm(args.texts, desc="Files:"):
-
-        iterator, nsent = read_file_in_batches(path, args.batch_size)
-        with tqdm(desc=path, total=nsent) as bar:
+    
+    for path in args.texts:
+        iterator, nsent, batch_len = read_file_in_batches(path, args.batch_size)
+        with tqdm(desc=path, total=batch_len) as bar:
             for batch in iterator:
+                bar.update(1)
+                graphs_predictions = []
                 if not batch:
                     continue
                 # ids, sentences, _, lemmas, synset_ids, sentence_ids = zip(*batch)
@@ -198,11 +228,11 @@ if __name__ == "__main__":
                 for i, g in bgraphs:
                     graphs_predictions.append([i, g])
 
-        graphs_predictions.sort(key=lambda x: x[0])
-        graphs_predictions_graphs = [encode(g) for (_, g) in graphs_predictions]
+                graphs_predictions.sort(key=lambda x: x[0])
+                graphs_predictions_graphs = [encode(g) for (_, g) in graphs_predictions]
 
-        with open("data/model/parsing/AMR/AMR-en/pred.plain.graphs.txt", "w") as f0:
-            f0.write("\n\n".join(graphs_predictions_graphs))
+                with open("/home/martinez/project/mousse/output/pred.graphs.txt", "a") as f0:
+                    f0.write("\n\n".join(graphs_predictions_graphs))
 
         exit(0)
 

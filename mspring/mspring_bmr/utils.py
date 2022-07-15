@@ -25,7 +25,7 @@ from transformers.models.mbart.tokenization_mbart_fast import *
 from transformers.models.bart.tokenization_bart_fast import *
 
 def instantiate_model_and_tokenizer(
-        name='facebook/bart-large',
+        name='facebook/bart-base',
         checkpoint=None,
         additional_tokens_smart_init=True,
         dropout = 0.15,
@@ -59,7 +59,7 @@ def instantiate_model_and_tokenizer(
     snt_tokenizer_type = None
     model_type = None
 
-    if penman_linearization and mode == "amr" and name =='facebook/bart-large':
+    if penman_linearization and mode == "amr" and name =='facebook/bart-base':
         snt_tokenizer_type = BartTokenizerFast
         tokenizer_type = PENMANBartTokenizer
         model_type = AMRBartForConditionalGeneration
@@ -69,7 +69,7 @@ def instantiate_model_and_tokenizer(
         tokenizer_type = PENMANMBartTokenizer
         model_type = AMRMBartForConditionalGeneration
 
-    elif penman_linearization and name =='facebook/bart-large':
+    elif penman_linearization and name =='facebook/bart-base':
         snt_tokenizer_type = BartTokenizerFast
         tokenizer_type = BMRPENMANBartTokenizer
         model_type = AMRBartForConditionalGeneration
@@ -79,7 +79,7 @@ def instantiate_model_and_tokenizer(
         tokenizer_type = BMRPENMANMBartTokenizer
         model_type = AMRMBartForConditionalGeneration
 
-    elif mode == "amr" and name =='facebook/bart-large':
+    elif mode == "amr" and name =='facebook/bart-base':
         snt_tokenizer_type = BartTokenizerFast
         tokenizer_type = AMRBartTokenizer
         model_type = AMRBartForConditionalGeneration
@@ -89,7 +89,7 @@ def instantiate_model_and_tokenizer(
         tokenizer_type = AMRMBartTokenizer
         model_type = AMRMBartForConditionalGeneration
 
-    elif name =='facebook/bart-large':
+    elif name =='facebook/bart-base':
         snt_tokenizer_type = BartTokenizerFast
         tokenizer_type = BMRBartTokenizer
         model_type = AMRBartForConditionalGeneration
@@ -262,6 +262,9 @@ def instantiate_model_and_tokenizer(
         model.model.set_input_embeddings(model.model.shared)
         if init_reverse:
             model.init_reverse_model()
+
+    # change params to 
+    # model.half()
 
     return model, tokenizer, snt_tokenizer
 

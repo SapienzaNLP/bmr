@@ -18,6 +18,19 @@ BACKOFF = penman.Graph(
 )
 
 
+
+def get_next_pointer(graph, next_pointer):
+    if next_pointer == 0:
+        for token in graph:
+            if "pointer:" in token:
+                pointer = int(token.split(":")[1].split(">")[0])
+                if pointer > next_pointer:
+                    next_pointer = pointer
+
+    next_pointer += 1
+    return f'<pointer:{next_pointer}>'
+
+
 def token_processing(tok):
     if tok is None:
         return None
@@ -38,8 +51,11 @@ def decode_into_node_and_backreferences(subtoken_ids, tokenizer):
     rex_arg = re.compile(f"^{tokenizer.INIT}(op|snt|conj|prep)")
     rex_spc = re.compile(r"<(s|/s|lit|/lit|stop|unk|pad|mask)>")
 
+    next_pointer = 0
+    
     # get strings
     subtokens = [tokenizer.convert_ids_to_tokens(t) for t in subtoken_ids]
+
     # fix backreferences
     subtoken_backreferences = [max(t - len(tokenizer), -1) for t in subtoken_ids]
     # strip padding
@@ -53,12 +69,19 @@ def decode_into_node_and_backreferences(subtoken_ids, tokenizer):
     subword_to_token_map = {}
     current_token_i = 0
     is_lit = False
+    is_wiki = False
 
     for subw_i, (subw_backr, subtok) in enumerate(zip(subtoken_backreferences, subtokens)):
         subword_to_token_map[subw_i] = current_token_i
 
         if subtok.startswith(f'{tokenizer.INIT}<lit>'):
             is_lit = True
+
+        # if subtok.endswith('-wiki'):
+        #     is_wiki = True
+# 
+        # if is_wiki and subtok.startswith(f'{tokenizer.INIT}</lit>'):
+        #     is_wiki = False
             
 
         # if empty you cannot do anything but add a new word
@@ -67,6 +90,10 @@ def decode_into_node_and_backreferences(subtoken_ids, tokenizer):
             backreferences.append(-1)
             current_token_i += 1
 
+        elif subtok == "</s>":
+            tokens.append(subtok.lstrip(tokenizer.INIT))
+            backreferences.append(-1)
+            current_token_i += 1
 
         # backref can't be splitted
         elif subw_backr > -1:
@@ -79,6 +106,21 @@ def decode_into_node_and_backreferences(subtoken_ids, tokenizer):
             tokens.append(subtok.lstrip(tokenizer.INIT))
             backreferences.append(-1)
             current_token_i += 1
+        # elif is_wiki and not is_lit and subtok.endswith('-wiki') and not (subtokens[subw_i+1].endswith(":quant") or subtokens[subw_i+1].endswith(":mod")):
+        #     tokens.append(subtok.lstrip(tokenizer.INIT) ) 
+        #     # tokens.append(":wiki") 
+        #     # tokens.append("-") 
+# 
+        # elif is_wiki and subtok.endswith('-wiki'):
+        #     tokens.append(subtok.lstrip(tokenizer.INIT) ) 
+        # 
+        # elif is_wiki and subtokens[subw_i-1].endswith('-wiki') and (subtok.endswith(':quant') or subtok.endswith(':mod')):
+        #     tokens.append(subtok.lstrip(tokenizer.INIT))
+# 
+        # elif is_wiki and not is_lit and tokens[-3].endswith('-wiki') and (tokens[-2].endswith(':quant') or tokens[-2].endswith(':mod')) and subtok.startswith(tokenizer.INIT):
+        #     # tokens.append(":wiki") 
+        #     # tokens.append("-")         
+        #     tokens.append(subtok.lstrip(tokenizer.INIT))
 
         elif ("." in tokens[-1] and tokens[-1].split(".")[0].isnumeric()) and (subtok == f"{tokenizer.INIT}." or subtok.lstrip(tokenizer.INIT).isnumeric()):
             tokens[-1] = tokens[-1] + subtok.lstrip(tokenizer.INIT)
@@ -154,6 +196,7 @@ def decode_into_node_and_backreferences(subtoken_ids, tokenizer):
         else:
             tokens[-1] = tokens[-1] + subtok
 
+    
     # strip INIT and fix byte-level
     tokens = [tokenizer.convert_tokens_to_string(list(t)).lstrip() if isinstance(t, str) else t for t in tokens]
     # tokens = [t.replace(tokenizer.INIT, '') if isinstance(t, str) else t for t in tokens]
@@ -237,8 +280,41 @@ def decode_into_node_and_backreferences(subtoken_ids, tokenizer):
             tokens += token_addition
             backreferences += backreferences_addition
             break
+    
+    # new_tokens = []
+    # next_pointer = "<pointer:0>"
+# 
+    # # recreate name entity structure
+    # for i, token in enumerate(tokens):
+    #     if token.startswith("<pointer") and not tokens[i+1].endswith(")"):
+    #         next_pointer = "<pointer:" + str(int(token.split("<pointer:")[1].split(">")[0])+1) + ">"
+# 
+    #     if token == ":name" and not tokens[i+1].startswith("<pointer"):
+    #         new_tokens.append(":name")
+    #         new_tokens.append("(")
+    #         new_tokens.append(next_pointer)
+    #         next_pointer = "<pointer:" + str(int(next_pointer.split("<pointer:")[1].split(">")[0])+1) + ">"
+# 
+    #         new_tokens.append("name")
+    #         k = 1
+    #         for span in tokens[i + 1][1:-1].split("Ñ"):
+    #             new_tokens.append(f":op{k}") 
+    #             if span.startswith("'") and span.endswith("'") and span[1:-1].isnumeric():
+    #                 new_tokens.append(f'"{span[1:-1]}"')
+    #             else:
+    #                 new_tokens.append(f'"{span}"' if not span.isnumeric() else span)
+    #             k += 1
+    #         
+    #         new_tokens.append(")")
+    #     elif i - 1 >= 0 and tokens[i - 1] == ":name" and not tokens[i].startswith("<pointer"):
+    #         continue
+    #     else:
+    #         new_tokens.append(token)
+    # 
+    # tokens = new_tokens
 
     tokens = [token_processing(t) for t in tokens]
+
 
     shift = 1
     if tokens[1] == "<s>":
@@ -252,6 +328,7 @@ def decode_into_node_and_backreferences(subtoken_ids, tokenizer):
         backreferences.pop()
     
     tokens = [t.replace('_,', ',').replace("_.", ".").replace("_-_", "-").replace("._com", ".com").replace("_)", ")").replace("(_", "(").replace('U._S.', "U.S.").replace("-_", "-").replace("~~", "_").replace("-:-", "_").replace("Ç", "_").replace("Ñ", " ") if isinstance(t, str) else t for t in tokens ]
+
 
     return tokens, backreferences
 
@@ -346,7 +423,6 @@ def _reconstruct_graph_from_nodes(nodes, backreferences):
     start_index = 0
 
     cnt = defaultdict(Counter)
-
     while start_index < len(nodes):
         stop_index = index_of("<stop>", nodes, default=len(nodes) + 1, start=start_index)
         old_start_index = start_index

@@ -1,4 +1,5 @@
 import copy
+from logging import PlaceHolder
 import sys
 from pathlib import Path
 
@@ -60,7 +61,7 @@ class AMRBartTokenizer(BartTokenizerFast):
             tok, count = line.split()
             if int(count) >= pred_min:
                 tokens.append(tok)
-
+# 
         for tok in Path(ROOT / f"{self.vocab_path}additions.txt").read_text().strip().splitlines():
             tokens.append(tok)
 
@@ -128,6 +129,10 @@ class AMRBartTokenizer(BartTokenizerFast):
         bpe_tokens = []
         bpe_backreferences = []
         counter = 0
+        is_wiki = False
+        is_name = False
+        wiki_entitiy = []
+
 
         for i, (backr, tokk) in enumerate(zip(backreferences, linearized_nodes)):
             is_in_enc = (
@@ -137,6 +142,73 @@ class AMRBartTokenizer(BartTokenizerFast):
             is_spc = tokk.startswith("<") and tokk.endswith(">")
             is_of = tokk.startswith(":") and tokk.endswith("-of")
             is_frame = re.match(r".+-\d\d", tokk) is not None
+            
+            # if linearized_nodes[i] == ":name" and linearized_nodes[i+1] == "(":
+            #     is_name = True
+            #     
+            # 
+            # if is_name and tokk == ")":
+            #     bpe_toks = [self.INIT + ":name"]
+            #     bpe_tokens.append(bpe_toks.copy())
+
+            #     if i == backr:
+            #         bpe_backr = list(range(counter, counter + len(bpe_toks)))
+            #         counter += len(bpe_toks)
+            #         bpe_backreferences.append(bpe_backr)
+            #     else:
+            #         bpe_backreferences.append(bpe_backreferences[backr][0:1])
+            #         counter += 1
+
+            #     name = []
+            #     for idx, unit in enumerate(wiki_entitiy):
+            #         if idx > 0 and wiki_entitiy[idx-1].startswith(":op"):
+            #             span = unit
+            #             if span.startswith('"'):
+            #                 span = span[1:-1]
+            #                 if span.isnumeric():
+            #                     span = "'" + span + "'"
+
+            #             else:
+            #                 span = unit
+            #             
+            #             name.append(span)
+
+            #     name = " ".join(name)
+            #     # name = " ".join([unit[1:-1] if unit[0] == '"' else unit for idx, unit in enumerate(wiki_entitiy) if idx > 0 and wiki_entitiy[idx-1].startswith(":op")])
+
+            #     tokk = name.replace(" ","Ñ").replace('_', 'Ç')
+            #     bpe_toks = [self.INIT + AMRTokens.LIT_START]
+            #     bpe_toks += self._tok_bpe(tokk)
+            #     bpe_toks.append(self.INIT + AMRTokens.LIT_END)
+
+            #     bpe_tokens.append(bpe_toks.copy())
+            #     
+            #     if i == backr:
+            #         bpe_backr = list(range(counter, counter + len(bpe_toks)))
+            #         counter += len(bpe_toks)
+            #         bpe_backreferences.append(bpe_backr)
+            #     else:
+            #         bpe_backreferences.append(bpe_backreferences[backr][0:1])
+            #         counter += 1
+
+
+            #     is_name = False
+            #     wiki_entitiy.clear()
+
+            #     continue
+    
+            # if tokk == ")":
+            #     is_wiki = False
+
+            # if is_name:
+            #     wiki_entitiy.append(tokk)
+            #     continue
+            # elif (i + 1 < len(linearized_nodes) and linearized_nodes[i + 1] == ":wiki" and not linearized_nodes[i - 1].startswith(":")) or (i + 3 < len(linearized_nodes) and linearized_nodes[i + 1] in [":quant", ":mod"] and linearized_nodes[i + 3] == ":wiki"):
+            #     is_wiki = True
+            #     bpe_toks = [self.INIT + tokk]
+            
+            # elif linearized_nodes[i] == ":wiki" or linearized_nodes[i - 1] == ":wiki":
+            #     continue
 
             if tokk.startswith('"') and tokk.endswith('"'):
                 tokk = tokk[1:-1].replace(" ","Ñ").replace('_', 'Ç')
@@ -187,7 +259,7 @@ class AMRBartTokenizer(BartTokenizerFast):
         middle_tokens = [str(t) for t in middle_tokens]
         post_tokenize_graph = "( " + " ".join(middle_tokens)
 
-        if pre_tokenize_graph.strip() !=  post_tokenize_graph.strip():
+        if pre_tokenize_graph.strip() !=  post_tokenize_graph.strip() and False:
             print(bpe_tokens)
             print(graph.metadata['id'])
             print(pre_tokenize_graph)
@@ -211,6 +283,7 @@ class AMRBartTokenizer(BartTokenizerFast):
             token_ids.append(self.eos_token_id)
             token_uni_ids.append(self.eos_token_id)
             backreferences.append(len(backreferences))
+
         return token_uni_ids, extra
 
     def batch_encode_graphs(self, graphs, device=torch.device("cpu")):
@@ -623,6 +696,30 @@ class PENMANBartTokenizer(AMRBartTokenizer):
                 triples.append(penman.Triple(var, ":instance", "thing"))
             else:
                 triples.append(triple)
+
+        new_triples = {}
+        for triple in triples:
+            if triple[0] + triple[1] + triple[2] not in new_triples:
+                if triple[1] != ":instance":
+                    if not (triple[2].startswith("z") and triple[2][1:].isnumeric()):
+
+                        if not triple[2].startswith('"') and not triple[2].replace('"', "").isnumeric():
+                            new_triples[triple[0] + triple[1] + triple[2]] = (triple[0], triple[1], '"' + triple[2].replace('"', "").strip() + '"')
+
+                        else:
+                            new_triples[triple[0] + triple[1] + triple[2]] =  (triple[0], triple[1], triple[2])
+                    
+                    elif triple[1].startswith(":quant") and triple[1]!= ":quant":
+                        new_triples[triple[0] + triple[1] + triple[2]] = (triple[0], ":quant", triple[1].split(":quant")[1])
+
+                    else:
+                        new_triples[triple[0] + triple[1] + triple[2]] = (triple[0], triple[1], triple[2])
+                else:
+                    new_triples[triple[0] + triple[1] + triple[2]] = (triple[0], triple[1], triple[2])
+
+        # list of values of new_triples
+        new_triples_list = [v for _,v in new_triples.items()]
+
         graph = penman.Graph(triples)
         linearized = encode(graph)
 
@@ -660,6 +757,7 @@ class PENMANBartTokenizer(AMRBartTokenizer):
         linearized = fix_text(linearized)
 
         g = penman.decode(linearized)
+
         return g
 
     def decode_amr(self, tokens, restore_name_ops=None):

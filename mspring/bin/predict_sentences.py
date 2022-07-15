@@ -90,7 +90,7 @@ if __name__ == "__main__":
         decoder_token_id = tokenizer.convert_tokens_to_ids(args.language)
         
     pred_sentences = predict_sentences_multilingual(
-        loader, model.rev, tokenizer, beam_size=args.beam_size, return_all=args.return_all
+        loader, model.rev, tokenizer, beam_size=args.beam_size, decoder_start_token_id=decoder_token_id, return_all=args.return_all
     )
     if args.add_to_graph_file:
         graphs = loader.dataset.graphs

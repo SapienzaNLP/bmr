@@ -4,7 +4,7 @@ import penman
 import torch
 
 from mspring_bmr import ROOT
-from mspring_bmr.evaluation import predict_amrs, compute_smatch, compute_smatch_graphs
+from mspring_bmr.evaluation import predict_amrs, predict_amrs_beam, compute_smatch, compute_smatch_graphs
 from mspring_bmr.penman import encode
 from mspring_bmr.utils import instantiate_loader, instantiate_model_and_tokenizer
 import random
@@ -33,7 +33,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--checkpoint", type=str, required=True, help="Required. Checkpoint to restore.")
     parser.add_argument(
-        "--model", type=str, default="facebook/bart-large", help="Model config to use to load the model class."
+        "--model", type=str, default="facebook/bart-base", help="Model config to use to load the model class."
     )
     parser.add_argument("--beam-size", type=int, default=1, help="Beam size.")
     parser.add_argument(
@@ -61,7 +61,7 @@ if __name__ == "__main__":
     parser.add_argument("--raw-graph", action="store_true")
     parser.add_argument("--restore-name-ops", action="store_true")
     parser.add_argument("--return-all", action="store_true")
-    parser.add_argument("--mode", type=str, default="bmr", help="Mode used to run the program, either amr/amr+/bmr/amr2bmr.")
+    parser.add_argument("--mode", type=str, default="amr", help="Mode used to run the program, either amr/amr+/bmr/amr2bmr.")
     parser.add_argument("--language", type=str, default="en_XX", help="Language of the target sentences.")
 
     args = parser.parse_args()
@@ -100,7 +100,7 @@ if __name__ == "__main__":
     )
     loader.device = device
 
-    decoder_token_id = 0 if args.model == "facebook/bart-large" else tokenizer.convert_tokens_to_ids("en_XX")
+    decoder_token_id = 0 if args.model == "facebook/bart-base" else tokenizer.convert_tokens_to_ids("en_XX")
 
     graphs = predict_amrs(
         loader,
@@ -113,7 +113,7 @@ if __name__ == "__main__":
     )
     if args.return_all:
         graphs = [g for gg in graphs for g in gg]
-
+    
     pieces = [encode(g) for g in graphs]
     pred_path.write_text("\n\n".join(pieces))
 
